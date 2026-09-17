@@ -47,6 +47,20 @@ void main() {
     expect(board.status, GameStatus.won);
   });
 
+  test('empty cells can be rectangle corners', () {
+    final board = GameBoard();
+    clearBoard(board);
+    board.cells[0][1] = 4;
+    board.cells[0][2] = 6;
+    // Corners [0,0] and [0,3] are empty.
+    board.tap(const CellPos(0, 0));
+    expect(board.selection, const CellPos(0, 0));
+    expect(board.tap(const CellPos(0, 3)), isTrue);
+    expect(board.cells[0][1], isNull);
+    expect(board.cells[0][2], isNull);
+    expect(board.score, 2);
+  });
+
   test('reports no more moves when none remain', () {
     final board = GameBoard();
     clearBoard(board);

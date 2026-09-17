@@ -39,7 +39,7 @@ class HomeScreen extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 40),
                 child: Text(
-                  'Select two corners. Clear every circle in a rectangle that adds up to 10.',
+                  'Select two corners — including empty spots. Clear every circle in a rectangle that adds up to 10.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: const Color(0xFFD7E8DE),

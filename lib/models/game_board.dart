@@ -89,23 +89,19 @@ class GameBoard {
   bool isValidMove(CellPos a, CellPos b) => sumRectangle(a, b) == 10;
 
   bool hasAnyValidMove() {
-    final occupied = <CellPos>[];
-    for (var r = 0; r < rows; r++) {
-      for (var c = 0; c < cols; c++) {
-        if (cells[r][c] != null) {
-          occupied.add(CellPos(r, c));
-        }
-      }
-    }
+    // Corners may be empty or occupied — check every pair of cells.
+    final positions = <CellPos>[
+      for (var r = 0; r < rows; r++)
+        for (var c = 0; c < cols; c++) CellPos(r, c),
+    ];
 
-    for (var i = 0; i < occupied.length; i++) {
-      for (var j = i + 1; j < occupied.length; j++) {
-        if (isValidMove(occupied[i], occupied[j])) {
+    for (var i = 0; i < positions.length; i++) {
+      for (var j = i + 1; j < positions.length; j++) {
+        if (isValidMove(positions[i], positions[j])) {
           return true;
         }
       }
     }
-    // A lone cell never sums to 10 (values are 1–9), so pairs only.
     return false;
   }
 
@@ -126,9 +122,9 @@ class GameBoard {
   }
 
   /// Returns true if a successful clear happened.
+  /// Empty cells are valid rectangle corners (start/end).
   bool tap(CellPos pos) {
     if (status != GameStatus.playing) return false;
-    if (cells[pos.row][pos.col] == null) return false;
 
     if (selection == null) {
       selection = pos;

@@ -59,7 +59,6 @@ class _GameScreenState extends State<GameScreen> {
 
   Future<void> _onTap(CellPos pos) async {
     if (_board.status != GameStatus.playing) return;
-    if (_board.valueAt(pos) == null) return;
 
     final first = _board.selection;
 

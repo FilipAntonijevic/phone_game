@@ -18,8 +18,40 @@ class NumberCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Empty cells stay tappable so they can be rectangle corners.
     if (value == null) {
-      return const SizedBox.expand();
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            curve: Curves.easeOut,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: selected
+                  ? const Color(0xFFF0C75E).withValues(alpha: 0.22)
+                  : Colors.transparent,
+              border: Border.all(
+                color: selected
+                    ? const Color(0xFFF0C75E)
+                    : const Color(0xFF2A4038),
+                width: selected ? 2.5 : 1.2,
+              ),
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFFF0C75E).withValues(alpha: 0.28),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : null,
+            ),
+          ),
+        ),
+      );
     }
 
     final Color fill;
