@@ -29,6 +29,8 @@ class GameBoard {
 
   static const int cols = 8;
   static const int rows = 15;
+  static const int weakenUnlockEvery = 20;
+  static const int blastUnlockEvery = 30;
 
   final Random _random;
   final List<List<int?>> cells;
@@ -36,6 +38,16 @@ class GameBoard {
   int score = 0;
   GameStatus status = GameStatus.playing;
   CellPos? selection;
+
+  /// −1 on 5 random circles. One charge every [weakenUnlockEvery] score.
+  int weakenCharges = 0;
+
+  /// Next tapped circle is destroyed. One charge every [blastUnlockEvery] score.
+  int blastCharges = 0;
+  bool blastArmed = false;
+
+  int _weakenGranted = 0;
+  int _blastGranted = 0;
 
   void fillRandom() {
     for (var r = 0; r < rows; r++) {
@@ -46,6 +58,11 @@ class GameBoard {
     score = 0;
     status = GameStatus.playing;
     selection = null;
+    weakenCharges = 0;
+    blastCharges = 0;
+    blastArmed = false;
+    _weakenGranted = 0;
+    _blastGranted = 0;
   }
 
   int? valueAt(CellPos pos) => cells[pos.row][pos.col];
@@ -57,6 +74,18 @@ class GameBoard {
       }
     }
     return true;
+  }
+
+  List<CellPos> get occupiedCells {
+    final result = <CellPos>[];
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        if (cells[r][c] != null) {
+          result.add(CellPos(r, c));
+        }
+      }
+    }
+    return result;
   }
 
   /// All occupied cells inside the axis-aligned rectangle whose diagonals
@@ -125,26 +154,95 @@ class GameBoard {
 
   bool hasAnyValidMove() => findHint() != null;
 
+  bool get hasUsablePowerUp =>
+      weakenCharges > 0 || blastCharges > 0 || blastArmed;
+
   void _clearCells(Iterable<CellPos> positions) {
     for (final pos in positions) {
       cells[pos.row][pos.col] = null;
     }
   }
 
+  void _addScore(int amount) {
+    if (amount <= 0) return;
+    score += amount;
+    final weakenTarget = score ~/ weakenUnlockEvery;
+    final blastTarget = score ~/ blastUnlockEvery;
+    weakenCharges += weakenTarget - _weakenGranted;
+    blastCharges += blastTarget - _blastGranted;
+    _weakenGranted = weakenTarget;
+    _blastGranted = blastTarget;
+  }
+
   void _refreshEndState() {
     if (isCleared) {
       status = GameStatus.won;
-    } else if (!hasAnyValidMove()) {
+    } else if (!hasAnyValidMove() && !hasUsablePowerUp) {
       status = GameStatus.noMoreMoves;
     } else {
       status = GameStatus.playing;
     }
   }
 
-  /// Returns true if a successful clear happened.
+  /// Decrease up to 5 random circles by 1. Circles that reach 0 are removed.
+  /// Returns positions that changed (for UI). Null if unused.
+  List<CellPos>? useWeaken() {
+    if (status != GameStatus.playing || weakenCharges <= 0) return null;
+    final occupied = occupiedCells;
+    if (occupied.isEmpty) return null;
+
+    weakenCharges--;
+    selection = null;
+    blastArmed = false;
+
+    occupied.shuffle(_random);
+    final targets = occupied.take(min(5, occupied.length)).toList();
+    final removed = <CellPos>[];
+
+    for (final pos in targets) {
+      final next = cells[pos.row][pos.col]! - 1;
+      if (next <= 0) {
+        cells[pos.row][pos.col] = null;
+        removed.add(pos);
+      } else {
+        cells[pos.row][pos.col] = next;
+      }
+    }
+
+    _addScore(removed.length);
+    _refreshEndState();
+    return targets;
+  }
+
+  /// Arm blast: next occupied circle tap destroys it. Returns false if unused.
+  bool armBlast() {
+    if (status != GameStatus.playing || blastCharges <= 0) return false;
+    if (blastArmed) {
+      // Toggle off and refund.
+      blastArmed = false;
+      blastCharges++;
+      return true;
+    }
+    blastCharges--;
+    blastArmed = true;
+    selection = null;
+    return true;
+  }
+
+  /// Returns true if a successful clear / blast happened.
   /// Empty cells are valid rectangle corners (start/end).
   bool tap(CellPos pos) {
     if (status != GameStatus.playing) return false;
+
+    if (blastArmed) {
+      if (cells[pos.row][pos.col] == null) return false;
+      cells[pos.row][pos.col] = null;
+      blastArmed = false;
+      selection = null;
+      _addScore(1);
+      _refreshEndState();
+      return true;
+    }
 
     if (selection == null) {
       selection = pos;
@@ -167,7 +265,7 @@ class GameBoard {
 
     final toClear = cellsInRectangle(first, pos);
     _clearCells(toClear);
-    score += toClear.length;
+    _addScore(toClear.length);
     _refreshEndState();
     return true;
   }
