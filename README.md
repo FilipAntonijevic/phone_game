@@ -9,9 +9,12 @@ A Flutter phone game: clear an 8×15 grid of numbered circles by selecting recta
 3. Tap one cell to select it, then tap another. Those two points are the **diagonal corners** of a rectangle. **Empty cells can also be corners.**
 4. If the sum of all remaining numbers inside that rectangle equals **10**, those circles are removed and the count is added to your **score**.
 5. A **timer** runs from the start of the round.
-6. The round ends when:
+6. **Power-ups**
+   - **−1 ×5**: decrease 5 random circles by 1 (unlocks every **20** score)
+   - **Blast**: destroy the next circle you tap (unlocks every **30** score)
+7. The round ends when:
    - every circle is cleared → **You won**
-   - no rectangle summing to 10 remains → **No more moves**
+   - no rectangle summing to 10 remains and no power-ups are left → **No more moves**
 
 ## Run (web)
 
