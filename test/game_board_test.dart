@@ -12,8 +12,9 @@ void clearBoard(GameBoard board) {
   board.score = 0;
   board.status = GameStatus.playing;
   board.selection = null;
-  board.weakenCharges = 0;
-  board.blastCharges = 0;
+  board.hintFill = 0;
+  board.weakenFill = 0;
+  board.blastFill = 0;
   board.blastArmed = false;
 }
 
@@ -57,7 +58,6 @@ void main() {
     clearBoard(board);
     board.cells[0][1] = 4;
     board.cells[0][2] = 6;
-    // Corners [0,0] and [0,3] are empty.
     board.tap(const CellPos(0, 0));
     expect(board.selection, const CellPos(0, 0));
     expect(board.tap(const CellPos(0, 3)), isTrue);
@@ -94,10 +94,9 @@ void main() {
     expect(board.status, GameStatus.won);
   });
 
-  test('weaken and blast unlock from score thresholds', () {
+  test('score fills power meters; cast resets only that meter', () {
     final board = GameBoard();
     clearBoard(board);
-    // Fill with 9s; keep one permanent scoring pair so the game stays playable.
     for (var r = 0; r < GameBoard.rows; r++) {
       for (var c = 0; c < GameBoard.cols; c++) {
         board.cells[r][c] = 9;
@@ -113,37 +112,61 @@ void main() {
       expect(board.tap(CellPos(r, c + 1)), isTrue);
     }
 
-    // 10 pairs => score 20
+    // 10 pairs => +20 score
     for (var i = 0; i < 10; i++) {
       clearPair(i, 0);
     }
     expect(board.score, 20);
-    expect(board.weakenCharges, 1);
-    expect(board.blastCharges, 0);
+    expect(board.blastFill, GameBoard.blastCost);
+    expect(board.blastReady, isTrue);
+    expect(board.weakenFill, 20);
+    expect(board.weakenReady, isFalse);
+    expect(board.hintFill, 20);
+    expect(board.hintReady, isFalse);
 
-    clearPair(10, 0);
-    expect(board.score, 22);
-    expect(board.blastCharges, 0);
+    // Cast blast — only blast meter resets.
+    expect(board.armBlast(), isTrue);
+    expect(board.blastFill, 0);
+    expect(board.blastArmed, isTrue);
+    expect(board.weakenFill, 20);
+    expect(board.hintFill, 20);
 
-    for (var i = 0; i < 4; i++) {
-      clearPair(11, i * 2);
+    board.cells[12][0] = 8;
+    expect(board.tap(const CellPos(12, 0)), isTrue);
+    expect(board.score, 21);
+    expect(board.blastFill, 1);
+    expect(board.weakenFill, 21);
+    expect(board.hintFill, 21);
+
+    // Reach weaken ready at 30
+    for (var i = 0; i < 5; i++) {
+      clearPair(10, 0);
     }
-    expect(board.score, 30);
-    expect(board.weakenCharges, 1);
-    expect(board.blastCharges, 1);
+    // +10 more from pairs, but one cell was already blasted from row12...
+    // After 5 pairs of +2 = +10 => score 31
+    expect(board.score, 31);
+    expect(board.weakenReady, isTrue);
+    expect(board.hintFill, 31);
+    expect(board.hintReady, isFalse);
+
+    final weakened = board.useWeaken();
+    expect(weakened, isNotNull);
+    expect(board.weakenFill, lessThan(GameBoard.weakenCost));
+    // weakenFill was reset to 0 then maybe increased if removals scored
+    expect(board.weakenReady, isFalse);
   });
 
   test('weaken reduces five random circles', () {
     final board = GameBoard(random: Random(1));
     clearBoard(board);
-    board.weakenCharges = 1;
+    board.weakenFill = GameBoard.weakenCost;
     for (var c = 0; c < 8; c++) {
       board.cells[0][c] = 2;
     }
     final changed = board.useWeaken();
     expect(changed, isNotNull);
     expect(changed!.length, 5);
-    expect(board.weakenCharges, 0);
+    expect(board.weakenReady, isFalse);
     var twos = 0;
     var ones = 0;
     for (var c = 0; c < 8; c++) {
@@ -157,13 +180,26 @@ void main() {
   test('blast destroys next occupied circle', () {
     final board = GameBoard();
     clearBoard(board);
-    board.blastCharges = 1;
+    board.blastFill = GameBoard.blastCost;
     board.cells[0][0] = 9;
     expect(board.armBlast(), isTrue);
     expect(board.blastArmed, isTrue);
+    expect(board.blastFill, 0);
     expect(board.tap(const CellPos(0, 0)), isTrue);
     expect(board.cells[0][0], isNull);
     expect(board.score, 1);
     expect(board.blastArmed, isFalse);
+  });
+
+  test('hint cast requires full meter and resets it', () {
+    final board = GameBoard();
+    clearBoard(board);
+    board.cells[0][0] = 4;
+    board.cells[0][1] = 6;
+    expect(board.useHint(), isNull);
+    board.hintFill = GameBoard.hintCost;
+    final hint = board.useHint();
+    expect(hint, isNotNull);
+    expect(board.hintFill, 0);
   });
 }

@@ -29,8 +29,11 @@ class GameBoard {
 
   static const int cols = 8;
   static const int rows = 15;
-  static const int weakenUnlockEvery = 20;
-  static const int blastUnlockEvery = 30;
+
+  /// Score progress needed to ready each power (meters fill with score gains).
+  static const int hintCost = 40;
+  static const int weakenCost = 30;
+  static const int blastCost = 20;
 
   final Random _random;
   final List<List<int?>> cells;
@@ -39,15 +42,16 @@ class GameBoard {
   GameStatus status = GameStatus.playing;
   CellPos? selection;
 
-  /// −1 on 5 random circles. One charge every [weakenUnlockEvery] score.
-  int weakenCharges = 0;
+  /// Fill meters 0..cost. Ready when fill == cost. Cast resets that meter to 0.
+  int hintFill = 0;
+  int weakenFill = 0;
+  int blastFill = 0;
 
-  /// Next tapped circle is destroyed. One charge every [blastUnlockEvery] score.
-  int blastCharges = 0;
   bool blastArmed = false;
 
-  int _weakenGranted = 0;
-  int _blastGranted = 0;
+  bool get hintReady => hintFill >= hintCost;
+  bool get weakenReady => weakenFill >= weakenCost;
+  bool get blastReady => blastFill >= blastCost;
 
   void fillRandom() {
     for (var r = 0; r < rows; r++) {
@@ -58,11 +62,10 @@ class GameBoard {
     score = 0;
     status = GameStatus.playing;
     selection = null;
-    weakenCharges = 0;
-    blastCharges = 0;
+    hintFill = 0;
+    weakenFill = 0;
+    blastFill = 0;
     blastArmed = false;
-    _weakenGranted = 0;
-    _blastGranted = 0;
   }
 
   int? valueAt(CellPos pos) => cells[pos.row][pos.col];
@@ -155,7 +158,7 @@ class GameBoard {
   bool hasAnyValidMove() => findHint() != null;
 
   bool get hasUsablePowerUp =>
-      weakenCharges > 0 || blastCharges > 0 || blastArmed;
+      hintReady || weakenReady || blastReady || blastArmed;
 
   void _clearCells(Iterable<CellPos> positions) {
     for (final pos in positions) {
@@ -166,12 +169,9 @@ class GameBoard {
   void _addScore(int amount) {
     if (amount <= 0) return;
     score += amount;
-    final weakenTarget = score ~/ weakenUnlockEvery;
-    final blastTarget = score ~/ blastUnlockEvery;
-    weakenCharges += weakenTarget - _weakenGranted;
-    blastCharges += blastTarget - _blastGranted;
-    _weakenGranted = weakenTarget;
-    _blastGranted = blastTarget;
+    hintFill = min(hintCost, hintFill + amount);
+    weakenFill = min(weakenCost, weakenFill + amount);
+    blastFill = min(blastCost, blastFill + amount);
   }
 
   void _refreshEndState() {
@@ -184,16 +184,29 @@ class GameBoard {
     }
   }
 
+  /// Spend a ready Hint. Resets hint fill to 0. Null if not ready / no move.
+  (CellPos, CellPos)? useHint() {
+    if (status != GameStatus.playing || !hintReady) return null;
+    final hint = findHint();
+    if (hint == null) return null;
+    hintFill = 0;
+    selection = null;
+    return hint;
+  }
+
   /// Decrease up to 5 random circles by 1. Circles that reach 0 are removed.
   /// Returns positions that changed (for UI). Null if unused.
   List<CellPos>? useWeaken() {
-    if (status != GameStatus.playing || weakenCharges <= 0) return null;
+    if (status != GameStatus.playing || !weakenReady) return null;
     final occupied = occupiedCells;
     if (occupied.isEmpty) return null;
 
-    weakenCharges--;
+    weakenFill = 0;
     selection = null;
-    blastArmed = false;
+    if (blastArmed) {
+      blastArmed = false;
+      blastFill = blastCost;
+    }
 
     occupied.shuffle(_random);
     final targets = occupied.take(min(5, occupied.length)).toList();
@@ -214,16 +227,17 @@ class GameBoard {
     return targets;
   }
 
-  /// Arm blast: next occupied circle tap destroys it. Returns false if unused.
+  /// Arm blast: next occupied circle tap destroys it.
+  /// Casting spends the meter (resets to 0). Cancel restores a ready meter.
   bool armBlast() {
-    if (status != GameStatus.playing || blastCharges <= 0) return false;
+    if (status != GameStatus.playing) return false;
     if (blastArmed) {
-      // Toggle off and refund.
       blastArmed = false;
-      blastCharges++;
+      blastFill = blastCost;
       return true;
     }
-    blastCharges--;
+    if (!blastReady) return false;
+    blastFill = 0;
     blastArmed = true;
     selection = null;
     return true;

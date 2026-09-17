@@ -63,11 +63,10 @@ class _GameScreenState extends State<GameScreen> {
 
   void _showHint() {
     if (_board.status != GameStatus.playing) return;
-    final hint = _board.findHint();
+    final hint = _board.useHint();
     if (hint == null) return;
     HapticFeedback.selectionClick();
     setState(() {
-      _board.selection = null;
       _previewRect = {};
       _hintCorners = {hint.$1, hint.$2};
     });
@@ -91,7 +90,7 @@ class _GameScreenState extends State<GameScreen> {
 
   void _toggleBlast() {
     if (_board.status != GameStatus.playing) return;
-    if (!_board.blastArmed && _board.blastCharges <= 0) return;
+    if (!_board.blastArmed && !_board.blastReady) return;
     HapticFeedback.selectionClick();
     setState(() {
       _hintCorners = {};
@@ -206,13 +205,27 @@ class _GameScreenState extends State<GameScreen> {
                     children: [
                       Expanded(
                         child: _PowerButton(
+                          label: 'Hint',
+                          fill: _board.hintFill,
+                          cost: GameBoard.hintCost,
+                          active: false,
+                          color: const Color(0xFF5EC8E8),
+                          onPressed: _board.status == GameStatus.playing &&
+                                  _board.hintReady
+                              ? _showHint
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _PowerButton(
                           label: '−1 ×5',
-                          detail: 'every 20',
-                          charges: _board.weakenCharges,
+                          fill: _board.weakenFill,
+                          cost: GameBoard.weakenCost,
                           active: false,
                           color: const Color(0xFFE8A87C),
                           onPressed: _board.status == GameStatus.playing &&
-                                  _board.weakenCharges > 0
+                                  _board.weakenReady
                               ? _useWeaken
                               : null,
                         ),
@@ -220,40 +233,17 @@ class _GameScreenState extends State<GameScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _PowerButton(
-                          label: _board.blastArmed ? 'Tap circle' : 'Blast',
-                          detail: 'every 30',
-                          charges: _board.blastArmed
-                              ? 1
-                              : _board.blastCharges,
+                          label: _board.blastArmed ? 'Tap!' : 'Blast',
+                          fill: _board.blastArmed
+                              ? GameBoard.blastCost
+                              : _board.blastFill,
+                          cost: GameBoard.blastCost,
                           active: _board.blastArmed,
                           color: const Color(0xFFE86B6B),
                           onPressed: _board.status == GameStatus.playing &&
-                                  (_board.blastArmed ||
-                                      _board.blastCharges > 0)
+                                  (_board.blastArmed || _board.blastReady)
                               ? _toggleBlast
                               : null,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      TextButton.icon(
-                        onPressed: _board.status == GameStatus.playing
-                            ? _showHint
-                            : null,
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFF5EC8E8),
-                          disabledForegroundColor: const Color(0xFF3A5560),
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                        ),
-                        icon: const Icon(
-                          Icons.lightbulb_outline_rounded,
-                          size: 20,
-                        ),
-                        label: const Text(
-                          'Hint',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
                         ),
                       ),
                     ],
@@ -411,16 +401,16 @@ class _GameScreenState extends State<GameScreen> {
 class _PowerButton extends StatelessWidget {
   const _PowerButton({
     required this.label,
-    required this.detail,
-    required this.charges,
+    required this.fill,
+    required this.cost,
     required this.active,
     required this.color,
     required this.onPressed,
   });
 
   final String label;
-  final String detail;
-  final int charges;
+  final int fill;
+  final int cost;
   final bool active;
   final Color color;
   final VoidCallback? onPressed;
@@ -428,6 +418,9 @@ class _PowerButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onPressed != null;
+    final ready = fill >= cost;
+    final progress = cost == 0 ? 0.0 : (fill / cost).clamp(0.0, 1.0);
+
     return Material(
       color: active
           ? color.withValues(alpha: 0.28)
@@ -437,66 +430,53 @@ class _PowerButton extends StatelessWidget {
         onTap: onPressed,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: active
+              color: active || ready
                   ? color
-                  : enabled
-                      ? color.withValues(alpha: 0.55)
-                      : const Color(0xFF2E4A3B),
+                  : const Color(0xFF2E4A3B),
+              width: ready || active ? 1.6 : 1,
             ),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
                       label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: enabled
+                        color: enabled || ready
                             ? const Color(0xFFF3F7F1)
                             : const Color(0xFF6F8579),
                         fontWeight: FontWeight.w800,
-                        fontSize: 13,
+                        fontSize: 12,
                       ),
                     ),
-                    Text(
-                      detail,
-                      style: TextStyle(
-                        color: enabled
-                            ? color.withValues(alpha: 0.9)
-                            : const Color(0xFF55685E),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                constraints: const BoxConstraints(minWidth: 22),
-                decoration: BoxDecoration(
-                  color: enabled
-                      ? color.withValues(alpha: 0.2)
-                      : const Color(0xFF24362D),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  '$charges',
-                  style: TextStyle(
-                    color: enabled ? color : const Color(0xFF6F8579),
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
                   ),
+                  Text(
+                    ready ? 'Ready' : '$fill/$cost',
+                    style: TextStyle(
+                      color: ready ? color : const Color(0xFF8EAA9A),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 4,
+                  backgroundColor: const Color(0xFF24362D),
+                  color: color,
                 ),
               ),
             ],
