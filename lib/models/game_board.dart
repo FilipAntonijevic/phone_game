@@ -86,24 +86,44 @@ class GameBoard {
     return sum;
   }
 
-  bool isValidMove(CellPos a, CellPos b) => sumRectangle(a, b) == 10;
+  bool isValidMove(CellPos a, CellPos b) =>
+      a != b && sumRectangle(a, b) == 10;
 
-  bool hasAnyValidMove() {
-    // Corners may be empty or occupied — check every pair of cells.
-    final positions = <CellPos>[
-      for (var r = 0; r < rows; r++)
-        for (var c = 0; c < cols; c++) CellPos(r, c),
-    ];
+  /// Returns two corner cells that form a scoring rectangle, or null.
+  /// Prefers the smallest rectangle (fewest occupied cells, then area).
+  (CellPos, CellPos)? findHint() {
+    (CellPos, CellPos)? best;
+    var bestCount = 1 << 30;
+    var bestArea = 1 << 30;
 
-    for (var i = 0; i < positions.length; i++) {
-      for (var j = i + 1; j < positions.length; j++) {
-        if (isValidMove(positions[i], positions[j])) {
-          return true;
+    for (var r1 = 0; r1 < rows; r1++) {
+      for (var c1 = 0; c1 < cols; c1++) {
+        for (var r2 = r1; r2 < rows; r2++) {
+          for (var c2 = 0; c2 < cols; c2++) {
+            if (r1 == r2 && c2 <= c1) continue;
+            final a = CellPos(r1, c1);
+            final b = CellPos(r2, c2);
+            if (!isValidMove(a, b)) continue;
+
+            final occupied = cellsInRectangle(a, b);
+            final count = occupied.length;
+            final area = ((max(r1, r2) - min(r1, r2) + 1) *
+                    (max(c1, c2) - min(c1, c2) + 1))
+                .toInt();
+            if (count < bestCount ||
+                (count == bestCount && area < bestArea)) {
+              bestCount = count;
+              bestArea = area;
+              best = (a, b);
+            }
+          }
         }
       }
     }
-    return false;
+    return best;
   }
+
+  bool hasAnyValidMove() => findHint() != null;
 
   void _clearCells(Iterable<CellPos> positions) {
     for (final pos in positions) {

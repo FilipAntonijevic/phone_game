@@ -20,6 +20,7 @@ class _GameScreenState extends State<GameScreen> {
   Duration _elapsed = Duration.zero;
   Set<CellPos> _flashClear = {};
   Set<CellPos> _previewRect = {};
+  Set<CellPos> _hintCorners = {};
 
   @override
   void initState() {
@@ -54,11 +55,26 @@ class _GameScreenState extends State<GameScreen> {
       _elapsed = Duration.zero;
       _flashClear = {};
       _previewRect = {};
+      _hintCorners = {};
+    });
+  }
+
+  void _showHint() {
+    if (_board.status != GameStatus.playing) return;
+    final hint = _board.findHint();
+    if (hint == null) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _board.selection = null;
+      _previewRect = {};
+      _hintCorners = {hint.$1, hint.$2};
     });
   }
 
   Future<void> _onTap(CellPos pos) async {
     if (_board.status != GameStatus.playing) return;
+
+    setState(() => _hintCorners = {});
 
     final first = _board.selection;
 
@@ -82,7 +98,6 @@ class _GameScreenState extends State<GameScreen> {
         setState(() {
           _board.tap(pos);
           _flashClear = {};
-          // Recompute elapsed so win/lose dialog shows accurate time.
           _elapsed = DateTime.now().difference(_startedAt);
         });
         return;
@@ -137,9 +152,32 @@ class _GameScreenState extends State<GameScreen> {
                     ],
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: _board.status == GameStatus.playing
+                          ? _showHint
+                          : null,
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF5EC8E8),
+                        disabledForegroundColor: const Color(0xFF3A5560),
+                      ),
+                      icon: const Icon(Icons.lightbulb_outline_rounded, size: 20),
+                      label: const Text(
+                        'Hint',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
                     child: LayoutBuilder(
                       builder: (context, constraints) {
                         const gap = 6.0;
@@ -181,6 +219,8 @@ class _GameScreenState extends State<GameScreen> {
                                                 _flashClear
                                                     .contains(CellPos(r, c)),
                                             clearing: _flashClear
+                                                .contains(CellPos(r, c)),
+                                            hinted: _hintCorners
                                                 .contains(CellPos(r, c)),
                                             onTap: () =>
                                                 _onTap(CellPos(r, c)),

@@ -61,6 +61,16 @@ void main() {
     expect(board.score, 2);
   });
 
+  test('findHint returns corners that sum to 10', () {
+    final board = GameBoard();
+    clearBoard(board);
+    board.cells[2][2] = 7;
+    board.cells[2][3] = 3;
+    final hint = board.findHint();
+    expect(hint, isNotNull);
+    expect(board.sumRectangle(hint!.$1, hint.$2), 10);
+  });
+
   test('reports no more moves when none remain', () {
     final board = GameBoard();
     clearBoard(board);

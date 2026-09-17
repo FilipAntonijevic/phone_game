@@ -7,6 +7,7 @@ class NumberCircle extends StatelessWidget {
     required this.selected,
     required this.inRectangle,
     required this.clearing,
+    required this.hinted,
     required this.onTap,
   });
 
@@ -14,12 +15,26 @@ class NumberCircle extends StatelessWidget {
   final bool selected;
   final bool inRectangle;
   final bool clearing;
+  final bool hinted;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     // Empty cells stay tappable so they can be rectangle corners.
     if (value == null) {
+      final Color border;
+      final Color fill;
+      if (selected) {
+        fill = const Color(0xFFF0C75E).withValues(alpha: 0.22);
+        border = const Color(0xFFF0C75E);
+      } else if (hinted) {
+        fill = const Color(0xFF5EC8E8).withValues(alpha: 0.2);
+        border = const Color(0xFF5EC8E8);
+      } else {
+        fill = Colors.transparent;
+        border = const Color(0xFF2A4038);
+      }
+
       return Material(
         color: Colors.transparent,
         child: InkWell(
@@ -30,19 +45,18 @@ class NumberCircle extends StatelessWidget {
             curve: Curves.easeOut,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: selected
-                  ? const Color(0xFFF0C75E).withValues(alpha: 0.22)
-                  : Colors.transparent,
+              color: fill,
               border: Border.all(
-                color: selected
-                    ? const Color(0xFFF0C75E)
-                    : const Color(0xFF2A4038),
-                width: selected ? 2.5 : 1.2,
+                color: border,
+                width: (selected || hinted) ? 2.5 : 1.2,
               ),
-              boxShadow: selected
+              boxShadow: (selected || hinted)
                   ? [
                       BoxShadow(
-                        color: const Color(0xFFF0C75E).withValues(alpha: 0.28),
+                        color: (selected
+                                ? const Color(0xFFF0C75E)
+                                : const Color(0xFF5EC8E8))
+                            .withValues(alpha: 0.28),
                         blurRadius: 10,
                         spreadRadius: 1,
                       ),
@@ -66,6 +80,10 @@ class NumberCircle extends StatelessWidget {
       fill = const Color(0xFFF0C75E);
       border = const Color(0xFFFFE7A3);
       textColor = const Color(0xFF2A2108);
+    } else if (hinted) {
+      fill = const Color(0xFF2F6F84);
+      border = const Color(0xFF5EC8E8);
+      textColor = const Color(0xFFF3F7F1);
     } else if (inRectangle) {
       fill = const Color(0xFF3D7A5F);
       border = const Color(0xFF6FCB9A);
@@ -87,7 +105,10 @@ class NumberCircle extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: fill,
-            border: Border.all(color: border, width: selected ? 2.5 : 1.5),
+            border: Border.all(
+              color: border,
+              width: (selected || hinted) ? 2.5 : 1.5,
+            ),
             boxShadow: selected
                 ? [
                     BoxShadow(
@@ -96,7 +117,16 @@ class NumberCircle extends StatelessWidget {
                       spreadRadius: 1,
                     ),
                   ]
-                : null,
+                : hinted
+                    ? [
+                        BoxShadow(
+                          color:
+                              const Color(0xFF5EC8E8).withValues(alpha: 0.4),
+                          blurRadius: 10,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : null,
           ),
           alignment: Alignment.center,
           child: FittedBox(
